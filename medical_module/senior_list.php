@@ -496,7 +496,7 @@ if ($priority_min > 0) {
     $params[] = $priority_min;
 }
 
-$sql .= " ORDER BY priority_level DESC, last_name ASC, first_name ASC";
+$sql .= " ORDER BY COALESCE(priority_level, 1) DESC, last_name ASC, first_name ASC";
 
 $stmt = $conn->prepare($sql);
 $senior_rows = [];
@@ -583,6 +583,7 @@ $qs_filter = 'search=' . urlencode($search)
 .senior-list-item { border-left: 4px solid transparent; transition: background .12s; }
 .senior-list-item.active { background: #eef5ff; border-left-color: #0d6efd; }
 .senior-list-item:hover:not(.active) { background: #f8f9ff; }
+.senior-list-scroll { max-height: 360px; overflow-y: auto; }
 
 .detail-card { border: none; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.07); }
 .profile-pic-lg { width: 90px; height: 90px; object-fit: cover; border-radius: 50%; border: 3px solid #dee2e6; }
@@ -683,7 +684,7 @@ $qs_filter = 'search=' . urlencode($search)
                         <span class="fw-semibold"><i class="bi bi-people me-1"></i> Seniors</span>
                         <span class="badge bg-secondary"><?php echo count($senior_rows); ?></span>
                     </div>
-                    <div class="list-group list-group-flush" style="max-height:560px;overflow-y:auto;">
+                    <div class="list-group list-group-flush senior-list-scroll">
                         <?php if (empty($senior_rows)): ?>
                             <div class="p-4 text-center text-muted"><i class="bi bi-search fs-3 d-block mb-2"></i>No seniors found.</div>
                         <?php else: ?>

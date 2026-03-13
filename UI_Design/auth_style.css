@@ -1,0 +1,138 @@
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- HEADINGS --- */
+h1, h2, h3 {
+    margin-bottom: 20px;
+    color: #333;
+    text-align: center;
+}
+
+/* --- INPUTS --- */
+input[type="text"],
+input[type="number"],
+input[type="password"],
+select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+input:focus,
+select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+}
+
+/* --- BUTTONS --- */
+button {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* --- FORM GROUPS --- */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+/* --- MESSAGES --- */
+.message {
+    padding: 12px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.message.success {
+    background: #d4f4dd;
+    color: #067734;
+}
+
+.message.error {
+    background: #ffe6e6;
+    color: #eb3349;
+}
+
+/* --- RESULT BOXES --- */
+.result {
+    padding: 15px;
+    border-radius: 5px;
+    background: #f8f9fa;
+    margin-top: 10px;
+}
+
+.risk {
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.risk.low { color: green; }
+.risk.moderate { color: orange; }
+.risk.high { color: red; }
+.risk.critical { color: darkred; }
+
+/* --- GUIDANCE NOTES --- */
+.guidance {
+    font-size: 14px;
+    color: #333;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 600px) {
+    .container {
+        padding: 20px;
+    }
+}

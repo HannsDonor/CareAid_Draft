@@ -581,7 +581,8 @@ $qs_filter = 'search=' . urlencode($search)
 .content-area { padding: 28px; }
 
 .senior-list-item { border-left: 4px solid transparent; transition: background .12s; }
-.senior-list-item.active { background: #eef5ff; border-left-color: #0d6efd; }
+.senior-list-item.active { background: #eef5ff; border-left-color: #0d6efd; color: #0d6efd; }
+.senior-list-item.active .fw-semibold { color: #0d6efd; }
 .senior-list-item:hover:not(.active) { background: #f8f9ff; }
 .senior-list-scroll { max-height: 360px; overflow-y: auto; }
 

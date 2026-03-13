@@ -56,12 +56,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_checkup'])) {
 
 // ── URL parameters ─────────────────────────────────────────────────────────────
 $search      = trim($_GET['search'] ?? '');
+$senior_risk = (int)($_GET['senior_risk'] ?? 0);
 $view_senior = (int) ($_GET['senior_id'] ?? 0);
-$active_tab  = $_GET['tab'] ?? 'profile';   // 'profile' | 'health' | 'checkup' | 'records'
+$active_tab  = $_GET['tab'] ?? 'checkup';
+if (!in_array($active_tab, ['checkup', 'records'], true)) $active_tab = 'checkup';
+if ($senior_risk < 0 || $senior_risk > 5) $senior_risk = 0;
 
 // ── Fetch senior list ──────────────────────────────────────────────────────────
 $seniors = [];
-if ($search !== '') {
+if ($search !== '' && $senior_risk > 0) {
+    $like = '%' . $search . '%';
+    $sql = "SELECT senior_id, first_name, middle_name, last_name, gender, birth_date, profile_path, is_alive, priority_level
+            FROM senior_profiles
+            WHERE (first_name LIKE ? OR last_name LIKE ? OR middle_name LIKE ?)
+              AND priority_level = ?
+            ORDER BY last_name, first_name";
+    $s = $conn->prepare($sql);
+    $s->bind_param("sssi", $like, $like, $like, $senior_risk);
+} elseif ($search !== '') {
     $like = '%' . $search . '%';
     $sql = "SELECT senior_id, first_name, middle_name, last_name, gender, birth_date, profile_path, is_alive, priority_level
             FROM senior_profiles
@@ -69,6 +81,13 @@ if ($search !== '') {
             ORDER BY last_name, first_name";
     $s = $conn->prepare($sql);
     $s->bind_param("sss", $like, $like, $like);
+} elseif ($senior_risk > 0) {
+    $sql = "SELECT senior_id, first_name, middle_name, last_name, gender, birth_date, profile_path, is_alive, priority_level
+            FROM senior_profiles
+            WHERE priority_level = ?
+            ORDER BY last_name, first_name";
+    $s = $conn->prepare($sql);
+    $s->bind_param("i", $senior_risk);
 } else {
     $sql = "SELECT senior_id, first_name, middle_name, last_name, gender, birth_date, profile_path, is_alive, priority_level
             FROM senior_profiles
@@ -141,21 +160,20 @@ function age($dob) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Senior Checkup</title>
+<title>Senior Checkup — CareAid</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 <style>
-body { background: #f0f2f5; min-height: 100vh; }
-.sidebar {
-    width: 320px; min-width: 280px; max-width: 340px;
+.main-wrap { min-height: 100vh; background: #f0f2f5; }
+.topbar {
     background: #fff;
-    border-right: 1px solid #dee2e6;
-    height: 100vh;
-    overflow-y: auto;
-    position: sticky;
-    top: 0;
+    padding: 14px 28px;
+    border-bottom: 1px solid #e3e6ef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
-.main-panel { flex: 1; overflow-y: auto; padding: 24px; }
+.content-area { padding: 28px; }
 .senior-card {
     cursor: pointer;
     border-left: 4px solid transparent;
@@ -172,20 +190,6 @@ body { background: #f0f2f5; min-height: 100vh; }
     background: #dee2e6; display:flex; align-items:center; justify-content:center;
     font-size: 20px; color: #adb5bd;
 }
-.profile-avatar {
-    width: 110px; height: 110px; border-radius: 50%;
-    object-fit: cover; border: 3px solid #667eea;
-}
-.profile-avatar-placeholder {
-    width: 110px; height: 110px; border-radius: 50%;
-    background: #dee2e6; display:flex; align-items:center; justify-content:center;
-    font-size: 48px; color: #adb5bd; border: 3px solid #667eea;
-}
-.header-bar {
-    background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-    color: #fff; padding: 16px 24px;
-}
-
 /* ── Live risk indicator ─────────────────────────────────────────────────── */
 #risk-indicator {
     font-size: 1.1rem;
@@ -194,84 +198,25 @@ body { background: #f0f2f5; min-height: 100vh; }
     transition: color .25s;
 }
 .guideline-table td, .guideline-table th { font-size: .82rem; }
-
 /* ── Pulse animation for critical ───────────────────────────────────────── */
 @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:.5} }
 .pulse-red { animation: pulse-red 1s infinite; }
 </style>
 </head>
 <body>
+<?php include 'medical_navigation.php'; ?>
 
-<!-- Header -->
-<div class="header-bar d-flex align-items-center gap-3">
-    <i class="bi bi-heart-pulse-fill fs-4"></i>
-    <div>
-        <h5 class="mb-0 fw-bold">Senior Health Checkup</h5>
-        <small class="opacity-75">Monitor vitals &amp; health records</small>
-    </div>
-    <a href="../admin_module/admin_dashboard.php" class="btn btn-sm btn-light ms-auto">
-        <i class="bi bi-arrow-left"></i> Dashboard
-    </a>
-</div>
+<div class="mednav-main main-wrap">
 
-<div class="d-flex" style="height:calc(100vh - 65px);">
-
-<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
-<div class="sidebar d-flex flex-column">
-    <!-- Search -->
-    <form method="GET" class="p-3 border-bottom">
-        <div class="input-group input-group-sm">
-            <input type="text" name="search" class="form-control"
-                   placeholder="Search by name…"
-                   value="<?php echo htmlspecialchars($search); ?>">
-            <?php if ($view_senior): ?>
-            <input type="hidden" name="senior_id" value="<?php echo $view_senior; ?>">
-            <input type="hidden" name="tab" value="<?php echo htmlspecialchars($active_tab); ?>">
-            <?php endif; ?>
-            <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i></button>
-            <?php if ($search): ?>
-            <a href="?<?php echo $view_senior ? 'senior_id='.$view_senior.'&tab='.$active_tab : ''; ?>"
-               class="btn btn-outline-secondary" title="Clear"><i class="bi bi-x"></i></a>
-            <?php endif; ?>
+    <div class="topbar">
+        <div>
+            <h5 class="mb-0 fw-bold"><i class="bi bi-activity me-2 text-primary"></i>Senior Checkup</h5>
+            <small class="text-muted">Record and review senior vitals</small>
         </div>
-        <?php if ($search): ?>
-        <small class="text-muted d-block mt-1"><?php echo count($seniors); ?> result(s) for "<strong><?php echo htmlspecialchars($search); ?></strong>"</small>
-        <?php endif; ?>
-    </form>
-
-    <!-- Senior list -->
-    <div class="flex-grow-1 overflow-auto">
-        <?php if (empty($seniors)): ?>
-        <div class="text-center text-muted py-5"><i class="bi bi-person-x fs-1 d-block mb-2"></i>No seniors found.</div>
-        <?php else: ?>
-        <?php foreach ($seniors as $s): ?>
-        <?php
-            $full = htmlspecialchars($s['first_name'] . ' ' . $s['middle_name'] . ' ' . $s['last_name']);
-            $pic  = $s['profile_path'] ? '../senior_profile_pics/' . htmlspecialchars($s['profile_path']) : '';
-            $isActive = ($s['senior_id'] == $view_senior) ? 'active' : '';
-        ?>
-        <a href="?senior_id=<?php echo $s['senior_id']; ?>&tab=profile<?php echo $search ? '&search='.urlencode($search) : ''; ?>"
-           class="d-flex align-items-center gap-2 p-3 text-decoration-none text-dark border-bottom senior-card <?php echo $isActive; ?>">
-            <?php if ($pic): ?>
-            <img src="<?php echo $pic; ?>" class="avatar" alt="">
-            <?php else: ?>
-            <div class="avatar-placeholder"><i class="bi bi-person-fill"></i></div>
-            <?php endif; ?>
-            <div class="flex-grow-1 overflow-hidden">
-                <div class="fw-semibold text-truncate" style="font-size:.9rem;"><?php echo $full; ?></div>
-                <div class="d-flex gap-1 flex-wrap mt-1">
-                    <?php echo priorityBadge((int)$s['priority_level']); ?>
-                    <span class="badge bg-<?php echo $s['is_alive']==='yes'?'success':'secondary'; ?>"><?php echo $s['is_alive']==='yes'?'Alive':'Deceased'; ?></span>
-                </div>
-            </div>
-        </a>
-        <?php endforeach; ?>
-        <?php endif; ?>
+        <small class="text-muted"><?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?></small>
     </div>
-</div><!-- /sidebar -->
 
-<!-- ═══════════════════════ MAIN PANEL ════════════════════════ -->
-<div class="main-panel">
+    <div class="content-area">
 
 <?php if ($message): ?>
 <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show mb-3" role="alert">
@@ -281,33 +226,102 @@ body { background: #f0f2f5; min-height: 100vh; }
 <?php endif; ?>
 
 <?php if (!$senior): ?>
-<!-- ── Empty state ────────────────────────────────────────── -->
-<div class="text-center text-muted py-5 mt-5">
-    <i class="bi bi-person-lines-fill fs-1 d-block mb-3" style="color:#667eea;opacity:.4;"></i>
-    <h5>Select a senior from the list</h5>
-    <p class="small">Use the search bar or scroll to find a senior, then click to view their profile.</p>
+<!-- ── Senior search / picker ─────────────────────────────── -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-search text-primary"></i> Search Senior
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-sm-8 col-md-6">
+                <input type="text" name="search" class="form-control"
+                       placeholder="Search by name…"
+                       value="<?php echo htmlspecialchars($search); ?>">
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <select name="senior_risk" class="form-select">
+                    <option value="0" <?php echo $senior_risk === 0 ? 'selected' : ''; ?>>All Risk Levels</option>
+                    <option value="1" <?php echo $senior_risk === 1 ? 'selected' : ''; ?>>Risk Level 1</option>
+                    <option value="2" <?php echo $senior_risk === 2 ? 'selected' : ''; ?>>Risk Level 2</option>
+                    <option value="3" <?php echo $senior_risk === 3 ? 'selected' : ''; ?>>Risk Level 3</option>
+                    <option value="4" <?php echo $senior_risk === 4 ? 'selected' : ''; ?>>Risk Level 4</option>
+                    <option value="5" <?php echo $senior_risk === 5 ? 'selected' : ''; ?>>Risk Level 5</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> Search</button>
+                <?php if ($search || $senior_risk > 0): ?>
+                <a href="?" class="btn btn-outline-secondary ms-1"><i class="bi bi-x"></i> Clear</a>
+                <?php endif; ?>
+            </div>
+        </form>
+        <?php if ($search || $senior_risk > 0): ?>
+        <p class="mt-2 mb-0 text-muted small">
+            <?php echo count($seniors); ?> result(s)
+            <?php if ($search): ?> for "<strong><?php echo htmlspecialchars($search); ?></strong>"<?php endif; ?>
+            <?php if ($senior_risk > 0): ?> in <strong>Risk Level <?php echo $senior_risk; ?></strong><?php endif; ?>
+        </p>
+        <?php endif; ?>
+    </div>
 </div>
+
+<?php if (!empty($seniors)): ?>
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-people-fill text-secondary"></i> Select a Senior
+    </div>
+    <div class="list-group list-group-flush">
+        <?php foreach ($seniors as $s): ?>
+        <?php
+            $full = htmlspecialchars($s['first_name'] . ' ' . $s['middle_name'] . ' ' . $s['last_name']);
+            $pic  = $s['profile_path'] ? '../senior_profile_pics/' . htmlspecialchars($s['profile_path']) : '';
+        ?>
+        <a href="?senior_id=<?php echo $s['senior_id']; ?>&tab=checkup<?php echo $search ? '&search='.urlencode($search) : ''; ?><?php echo $senior_risk > 0 ? '&senior_risk='.(int)$senior_risk : ''; ?>"
+           class="list-group-item list-group-item-action d-flex align-items-center gap-3 senior-card">
+            <?php if ($pic): ?>
+            <img src="<?php echo $pic; ?>" class="avatar" alt="">
+            <?php else: ?>
+            <div class="avatar-placeholder"><i class="bi bi-person-fill"></i></div>
+            <?php endif; ?>
+            <div class="flex-grow-1">
+                <div class="fw-semibold"><?php echo $full; ?></div>
+                <div class="d-flex gap-1 flex-wrap mt-1">
+                    <?php echo priorityBadge((int)$s['priority_level']); ?>
+                    <span class="badge bg-<?php echo $s['is_alive']==='yes'?'success':'secondary'; ?>"><?php echo $s['is_alive']==='yes'?'Alive':'Deceased'; ?></span>
+                </div>
+            </div>
+            <i class="bi bi-chevron-right text-muted"></i>
+        </a>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php else: ?>
+<div class="text-center text-muted py-5">
+    <i class="bi bi-person-lines-fill fs-1 d-block mb-3" style="color:#667eea;opacity:.4;"></i>
+    <h5>Select a Senior</h5>
+    <p class="small">Search for a senior above to record a checkup.</p>
+</div>
+<?php endif; ?>
 
 <?php else: ?>
 
 <!-- ── Tab navigation ─────────────────────────────────────── -->
-<?php $base = '?senior_id='.$view_senior.($search?'&search='.urlencode($search):''); ?>
+<?php $base = '?senior_id='.$view_senior.($search?'&search='.urlencode($search):'').($senior_risk > 0 ? '&senior_risk='.(int)$senior_risk : ''); ?>
+
+<!-- Senior name bar -->
+<div class="d-flex align-items-center gap-3 mb-3">
+    <i class="bi bi-person-circle fs-3 text-primary"></i>
+    <div>
+        <h5 class="mb-0 fw-bold"><?php echo htmlspecialchars($senior['first_name'].' '.$senior['middle_name'].' '.$senior['last_name']); ?></h5>
+        <div class="d-flex gap-1 flex-wrap mt-1">
+            <?php echo priorityBadge((int)$senior['priority_level']); ?>
+            <span class="badge bg-<?php echo $senior['is_alive']==='yes'?'success':'secondary'; ?>"><?php echo $senior['is_alive']==='yes'?'Alive':'Deceased'; ?></span>
+        </div>
+    </div>
+    <a href="?<?php echo ($search ? 'search='.urlencode($search) : '').($search && $senior_risk > 0 ? '&' : '').($senior_risk > 0 ? 'senior_risk='.(int)$senior_risk : ''); ?>" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-arrow-left"></i> Back to list</a>
+</div>
+
 <ul class="nav nav-tabs mb-4">
-    <li class="nav-item">
-        <a class="nav-link <?php echo $active_tab==='profile'?'active':''; ?>"
-           href="<?php echo $base; ?>&tab=profile">
-            <i class="bi bi-person-fill"></i> Profile
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link <?php echo $active_tab==='health'?'active':''; ?>"
-           href="<?php echo $base; ?>&tab=health">
-            <i class="bi bi-clipboard2-pulse-fill"></i> Health Records
-            <?php if ($h_records): ?>
-            <span class="badge bg-secondary ms-1"><?php echo count($h_records); ?></span>
-            <?php endif; ?>
-        </a>
-    </li>
     <li class="nav-item">
         <a class="nav-link <?php echo $active_tab==='checkup'?'active':''; ?>"
            href="<?php echo $base; ?>&tab=checkup">
@@ -325,105 +339,7 @@ body { background: #f0f2f5; min-height: 100vh; }
     </li>
 </ul>
 
-<?php
-$pic_src = $senior['profile_path'] ? '../senior_profile_pics/' . htmlspecialchars($senior['profile_path']) : '';
-?>
 
-<!-- ════════════════ TAB: PROFILE ════════════════ -->
-<?php if ($active_tab === 'profile'): ?>
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="d-flex gap-4 align-items-start flex-wrap">
-            <!-- Avatar -->
-            <div class="text-center">
-                <?php if ($pic_src): ?>
-                <img src="<?php echo $pic_src; ?>" class="profile-avatar" alt="Profile Photo">
-                <?php else: ?>
-                <div class="profile-avatar-placeholder mx-auto"><i class="bi bi-person-fill"></i></div>
-                <?php endif; ?>
-                <div class="mt-2">
-                    <?php echo priorityBadge((int)$senior['priority_level']); ?>
-                    <span class="badge bg-<?php echo $senior['is_alive']==='yes'?'success':'secondary'; ?> ms-1">
-                        <?php echo $senior['is_alive']==='yes'?'Alive':'Deceased'; ?>
-                    </span>
-                </div>
-            </div>
-            <!-- Details -->
-            <div class="flex-grow-1">
-                <h4 class="fw-bold mb-1">
-                    <?php echo htmlspecialchars($senior['first_name'].' '.$senior['middle_name'].' '.$senior['last_name']); ?>
-                </h4>
-                <p class="text-muted mb-3">@<?php echo htmlspecialchars($senior['username'] ?? '—'); ?></p>
-                <div class="row g-3">
-                    <?php
-                    $fields = [
-                        ['bi-calendar3',        'Age',               age($senior['birth_date']) . ' yrs'],
-                        ['bi-gender-ambiguous', 'Gender',            $senior['gender'] ?? '—'],
-                        ['bi-cake2',            'Birth Date',        $senior['birth_date'] ?? '—'],
-                        ['bi-geo-alt-fill',     'Address',           $senior['address'] ?? '—'],
-                        ['bi-telephone-fill',   'Contact',           $senior['contact_number'] ?? '—'],
-                        ['bi-person-heart',     'Emergency Contact', $senior['emergency_contact'] ?? '—'],
-                        ['bi-shield-check',     'Account Status',    $senior['account_status'] ?? '—'],
-                    ];
-                    foreach ($fields as [$icon, $label, $val]):
-                    ?>
-                    <div class="col-sm-6">
-                        <div class="d-flex align-items-start gap-2">
-                            <i class="bi <?php echo $icon; ?> text-primary mt-1" style="font-size:1rem;"></i>
-                            <div>
-                                <div class="text-muted" style="font-size:.75rem;"><?php echo $label; ?></div>
-                                <div class="fw-semibold" style="font-size:.9rem;"><?php echo htmlspecialchars($val); ?></div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
-<!-- ════════════════ TAB: HEALTH RECORDS ════════════════ -->
-<?php if ($active_tab === 'health'): ?>
-<?php if (empty($h_records)): ?>
-<div class="text-center text-muted py-5">
-    <i class="bi bi-clipboard-x fs-1 d-block mb-2 opacity-25"></i>
-    No health records on file for this senior.
-</div>
-<?php else: ?>
-<div class="card shadow-sm border-0">
-    <div class="card-header bg-white fw-semibold">
-        <i class="bi bi-clipboard2-pulse-fill text-danger"></i>
-        Health Records — <?php echo htmlspecialchars($senior['first_name'].' '.$senior['last_name']); ?>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>#</th>
-                    <th>Condition</th>
-                    <th>Risk Level</th>
-                    <th>Notes</th>
-                    <th>Recorded</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($h_records as $i => $hr): ?>
-            <tr>
-                <td class="text-muted small"><?php echo $i + 1; ?></td>
-                <td class="fw-semibold"><?php echo htmlspecialchars($hr['chronic_conditions']); ?></td>
-                <td><?php echo riskBadge($hr['risk_level']); ?></td>
-                <td class="text-muted small"><?php echo htmlspecialchars($hr['notes'] ?? '—'); ?></td>
-                <td class="text-muted small"><?php echo $hr['created_at']; ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-<?php endif; ?>
-<?php endif; ?>
 
 <!-- ════════════════ TAB: CHECKUP ════════════════ -->
 <?php if ($active_tab === 'checkup'): ?>
@@ -439,7 +355,7 @@ $pic_src = $senior['profile_path'] ? '../senior_profile_pics/' . htmlspecialchar
                 </span>
             </div>
             <div class="card-body">
-                <form method="POST" action="?senior_id=<?php echo $view_senior; ?>&tab=checkup<?php echo $search?'&search='.urlencode($search):''; ?>">
+                <form method="POST" action="?senior_id=<?php echo $view_senior; ?>&tab=checkup<?php echo $search?'&search='.urlencode($search):''; ?><?php echo $senior_risk > 0 ? '&senior_risk='.(int)$senior_risk : ''; ?>">
                     <input type="hidden" name="senior_id" value="<?php echo $view_senior; ?>">
                     <input type="hidden" name="submit_checkup" value="1">
 
@@ -598,8 +514,8 @@ $pic_src = $senior['profile_path'] ? '../senior_profile_pics/' . htmlspecialchar
 <?php endif; ?>
 
 <?php endif; // senior selected ?>
-</div><!-- /main-panel -->
-</div><!-- /d-flex -->
+    </div><!-- /content-area -->
+</div><!-- /mednav-main -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>

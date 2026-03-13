@@ -40,6 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $redirect_url = '../admin_module/admin_dashboard.php';
                     } elseif ($role === 'health_worker') {
                         $redirect_url = '../medical_module/health_worker_dashboard.php';
+                    } elseif ($role === 'senior') {
+                        $redirect_url = '../senior_module/senior_dashboard.php';
                     } elseif ($role === 'finance_worker') {
                         $redirect_url = '../financial_module/finance_dashboard.php';
                     } else {

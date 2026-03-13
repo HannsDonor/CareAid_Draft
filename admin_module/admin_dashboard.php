@@ -280,6 +280,12 @@ $priorityMap = [
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-2">
+                        <a href="announcement.php" class="action-card h-100">
+                            <i class="bi bi-megaphone-fill text-danger"></i>
+                            Announcements
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2">
                         <a href="reports.php" class="action-card h-100">
                             <i class="bi bi-bar-chart-fill text-info"></i>
                             View Reports

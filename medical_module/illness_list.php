@@ -63,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['
     $illness_name = trim($_POST['illness_name'] ?? '');
     $category_name = trim($_POST['category_name'] ?? '');
     $risk_level = (int)($_POST['risk_level'] ?? 1);
+    $description = trim($_POST['description'] ?? '');
 
     if ($illness_name === '') {
         header('Location: ' . build_redirect_url($search_return, $category_return, 'err', 'Illness name is required.'));
@@ -91,13 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['
             }
         }
 
-        $ins = $conn->prepare("INSERT INTO illnesses (illness_name, category, risk_level) VALUES (?, ?, ?)");
+        $ins = $conn->prepare("INSERT INTO illnesses (illness_name, category, description, risk_level) VALUES (?, ?, ?, ?)");
         if (!$ins) {
             header('Location: ' . build_redirect_url($search_return, $category_return, 'err', 'Failed to prepare insert query.'));
             exit;
         }
 
-        $ins->bind_param('ssi', $illness_name, $category_name, $risk_level);
+        $ins->bind_param('sssi', $illness_name, $category_name, $description, $risk_level);
         $ok = $ins->execute();
         $ins->close();
 
@@ -161,7 +162,7 @@ if ($cat_res) {
     }
 }
 
-$sql = "SELECT illness_id, illness_name, category, risk_level FROM illnesses WHERE 1=1";
+$sql = "SELECT illness_id, illness_name, category, description, risk_level FROM illnesses WHERE 1=1";
 $types = '';
 $params = [];
 
@@ -289,10 +290,9 @@ if ($stmt) {
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th>
                                 <th>Illness Name</th>
-                                <th>Category</th>
                                 <th>Risk Level</th>
+                                <th>Description</th>
                                 <th>Edit</th>
                                 <th>Delete</th>
                             </tr>
@@ -300,10 +300,9 @@ if ($stmt) {
                         <tbody>
                             <?php foreach ($illness_rows as $row): ?>
                             <tr>
-                                <td class="text-muted small"><?php echo (int)($row['illness_id'] ?? 0); ?></td>
                                 <td class="fw-semibold"><?php echo htmlspecialchars((string)($row['illness_name'] ?? '-')); ?></td>
-                                <td><?php echo htmlspecialchars((string)($row['category'] ?? 'Uncategorized')); ?></td>
                                 <td><?php echo illness_priority_badge((int)($row['risk_level'] ?? 1)); ?></td>
+                                <td class="text-muted small"><?php echo nl2br(htmlspecialchars((string)($row['description'] ?? '-'))); ?></td>
                                 <td>
                                     <button
                                         type="button"
@@ -356,6 +355,11 @@ if ($stmt) {
                             <div class="mb-3">
                                 <label class="form-label">Category *</label>
                                 <input type="text" name="category_name" class="form-control" list="illnessCategoryOptions" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-control" rows="3" placeholder="Brief illness details..."></textarea>
                             </div>
 
                             <div>

@@ -77,12 +77,11 @@ function _nav_link(string $href, string $icon, string $label, string $current): 
 
         <div class="nav-section">Seniors</div>
         <?php echo _nav_link('senior_list.php', 'person-lines-fill', 'Senior List', $_nav_current); ?>
-        <?php echo _nav_link('../admin_module/manage_seniors.php', 'people-fill', 'Manage Seniors', $_nav_current); ?>
         <?php echo _nav_link('create_senior_profile.php', 'person-plus-fill', 'Senior Registration', $_nav_current); ?>
 
         <div class="nav-section">Medical</div>
         <?php echo _nav_link('senior_checkup.php', 'activity', 'Senior Checkup', $_nav_current); ?>
-        <?php echo _nav_link('../health_guidance.php', 'journal-medical', 'Health Guidance', $_nav_current); ?>
+        <?php echo _nav_link('health_guidance.php', 'journal-medical', 'Health Guidance', $_nav_current); ?>
         <?php echo _nav_link('illness_list.php', 'clipboard2-heart', 'List of Illness', $_nav_current); ?>
     </nav>
 

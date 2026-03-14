@@ -225,10 +225,88 @@ body {
 .data-label { color: #5f7283; font-size: .8rem; }
 .table thead th { white-space: nowrap; font-size: .82rem; }
 .table tbody td { font-size: .88rem; vertical-align: middle; }
+.assist-toggle {
+	position: fixed;
+	right: 18px;
+	bottom: 74px;
+	z-index: 1040;
+	border: 0;
+	border-radius: 999px;
+	width: 206px;
+	padding: 11px 16px;
+	background: linear-gradient(135deg, #c96a2f, #e49b47);
+	color: #fff;
+	box-shadow: 0 14px 28px rgba(23, 48, 66, 0.22);
+	font-weight: 600;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	transition: transform .18s ease, box-shadow .18s ease;
+}
+.assist-toggle:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 18px 34px rgba(23, 48, 66, 0.26);
+	color: #fff;
+}
+.quick-guide-toggle {
+	position: fixed;
+	right: 18px;
+	bottom: 18px;
+	z-index: 1040;
+	border: 0;
+	border-radius: 999px;
+	width: 206px;
+	padding: 11px 16px;
+	background: linear-gradient(135deg, var(--brand-blue), var(--brand-mint));
+	color: #fff;
+	box-shadow: 0 14px 28px rgba(23, 48, 66, 0.24);
+	font-weight: 600;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	transition: transform .18s ease, box-shadow .18s ease;
+	text-decoration: none;
+}
+.quick-guide-toggle:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 18px 34px rgba(23, 48, 66, 0.28);
+	color: #fff;
+}
+.quick-guide-modal .modal-content {
+	border: 0;
+	border-radius: 18px;
+	overflow: hidden;
+	box-shadow: 0 18px 42px rgba(18, 38, 56, 0.2);
+}
+.quick-guide-modal .modal-header {
+	background: linear-gradient(135deg, var(--brand-blue), var(--brand-mint));
+	color: #fff;
+	border-bottom: 0;
+}
+.quick-guide-modal .btn-close {
+	filter: invert(1);
+}
+.quick-guide-frame {
+	display: block;
+	width: 100%;
+	height: min(70vh, 620px);
+	border: 0;
+	background: #fff;
+}
 
 @media (max-width: 768px) {
 	.hero-grid { grid-template-columns: 1fr; text-align: center; }
 	.avatar, .avatar-fallback { margin: 0 auto; }
+	.quick-guide-toggle {
+		right: 12px;
+		bottom: 12px;
+	}
+	.assist-toggle {
+		right: 12px;
+		bottom: 66px;
+	}
 }
 </style>
 </head>
@@ -276,21 +354,7 @@ body {
 	</section>
 
 	<div class="row g-3 mt-1">
-		<div class="col-lg-4">
-			<div class="card card-soft h-100">
-				<div class="card-header bg-white fw-semibold">Profile Details</div>
-				<div class="card-body">
-					<div class="mb-2"><span class="data-label d-block">Age</span><strong><?php echo htmlspecialchars(age_from_birth($senior['birth_date'] ?? null)); ?></strong></div>
-					<div class="mb-2"><span class="data-label d-block">Gender</span><strong><?php echo htmlspecialchars((string)($senior['gender'] ?? 'N/A')); ?></strong></div>
-					<div class="mb-2"><span class="data-label d-block">Birth Date</span><strong><?php echo htmlspecialchars((string)($senior['birth_date'] ?? 'N/A')); ?></strong></div>
-					<div class="mb-2"><span class="data-label d-block">Contact Number</span><strong><?php echo htmlspecialchars((string)($senior['contact_number'] ?? 'N/A')); ?></strong></div>
-					<div class="mb-2"><span class="data-label d-block">Emergency Contact</span><strong><?php echo htmlspecialchars((string)($senior['emergency_contact'] ?? 'N/A')); ?></strong></div>
-					<div><span class="data-label d-block">Address</span><strong><?php echo htmlspecialchars((string)($senior['address'] ?? 'N/A')); ?></strong></div>
-				</div>
-			</div>
-		</div>
-
-		<div class="col-lg-8">
+		<div class="col-12">
 			<div class="card card-soft h-100">
 				<div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
 					<span><i class="bi bi-megaphone-fill text-danger me-1"></i>Barangay Announcements</span>
@@ -331,6 +395,48 @@ body {
 		</div>
 	</div>
 	<?php endif; ?>
+</div>
+
+<button type="button" class="assist-toggle" data-bs-toggle="modal" data-bs-target="#requestAssistanceModal">
+	<i class="bi bi-life-preserver"></i>
+	<span>Request Assistance</span>
+</button>
+
+<button type="button" class="quick-guide-toggle" data-bs-toggle="modal" data-bs-target="#quickGuidanceModal">
+	<i class="bi bi-heart-pulse-fill"></i>
+	<span>Quick Check Up</span>
+</button>
+
+<div class="modal fade quick-guide-modal" id="requestAssistanceModal" tabindex="-1" aria-labelledby="requestAssistanceModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-md">
+		<div class="modal-content">
+			<div class="modal-header">
+				<div>
+					<h5 class="modal-title fw-bold" id="requestAssistanceModalLabel">Request Assistance</h5>
+				</div>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body p-0">
+				<iframe src="assistance_request.php" title="Request assistance" class="quick-guide-frame"></iframe>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade quick-guide-modal" id="quickGuidanceModal" tabindex="-1" aria-labelledby="quickGuidanceModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg">
+		<div class="modal-content">
+			<div class="modal-header">
+				<div>
+					<h5 class="modal-title fw-bold" id="quickGuidanceModalLabel">Quick Check Up</h5>
+				</div>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body p-0">
+				<iframe src="quick_guidance.php" title="Quick check up" class="quick-guide-frame"></iframe>
+			</div>
+		</div>
+	</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

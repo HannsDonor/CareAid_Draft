@@ -81,6 +81,7 @@ function _nav_link(string $href, string $icon, string $label, string $current): 
 
         <div class="nav-section">Medical</div>
         <?php echo _nav_link('senior_checkup.php', 'activity', 'Senior Checkup', $_nav_current); ?>
+        <?php echo _nav_link('medical_assistance_request.php', 'clipboard2-check-fill', 'Medical Assistance Request', $_nav_current); ?>
         <?php echo _nav_link('health_guidance.php', 'journal-medical', 'Health Guidance', $_nav_current); ?>
         <?php echo _nav_link('illness_list.php', 'clipboard2-heart', 'List of Illness', $_nav_current); ?>
     </nav>

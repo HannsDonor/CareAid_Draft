@@ -58,9 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_checkup'])) {
 $search      = trim($_GET['search'] ?? '');
 $senior_risk = (int)($_GET['senior_risk'] ?? 0);
 $view_senior = (int) ($_GET['senior_id'] ?? 0);
+$senior_page = (int)($_GET['page'] ?? 1);
 $active_tab  = $_GET['tab'] ?? 'checkup';
 if (!in_array($active_tab, ['checkup', 'records'], true)) $active_tab = 'checkup';
 if ($senior_risk < 0 || $senior_risk > 5) $senior_risk = 0;
+if ($senior_page < 1) $senior_page = 1;
 
 // ── Fetch senior list ──────────────────────────────────────────────────────────
 $seniors = [];
@@ -100,6 +102,29 @@ while ($row = $result->fetch_assoc()) {
     $seniors[] = $row;
 }
 $s->close();
+
+$seniors_per_page = 4;
+$total_seniors = count($seniors);
+$total_pages = max(1, (int)ceil($total_seniors / $seniors_per_page));
+if ($senior_page > $total_pages) {
+    $senior_page = $total_pages;
+}
+$senior_offset = ($senior_page - 1) * $seniors_per_page;
+$paged_seniors = array_slice($seniors, $senior_offset, $seniors_per_page);
+
+function seniorListQueryString(string $search, int $senior_risk, int $page): string {
+    $params = [];
+    if ($search !== '') {
+        $params['search'] = $search;
+    }
+    if ($senior_risk > 0) {
+        $params['senior_risk'] = $senior_risk;
+    }
+    if ($page > 1) {
+        $params['page'] = $page;
+    }
+    return http_build_query($params);
+}
 
 // ── Fetch selected senior detail ───────────────────────────────────────────────
 $senior   = null;
@@ -181,6 +206,13 @@ function age($dob) {
 }
 .senior-card:hover  { background: #f8f9fa; }
 .senior-card.active { background: #e8f0fe; border-left-color: #667eea; }
+.senior-picker-card {
+    display: flex;
+    flex-direction: column;
+}
+.senior-list-scroll {
+    overflow: visible;
+}
 .avatar {
     width: 44px; height: 44px; border-radius: 50%;
     object-fit: cover; background: #dee2e6;
@@ -257,7 +289,7 @@ function age($dob) {
         </form>
         <?php if ($search || $senior_risk > 0): ?>
         <p class="mt-2 mb-0 text-muted small">
-            <?php echo count($seniors); ?> result(s)
+            <?php echo $total_seniors; ?> result(s)
             <?php if ($search): ?> for "<strong><?php echo htmlspecialchars($search); ?></strong>"<?php endif; ?>
             <?php if ($senior_risk > 0): ?> in <strong>Risk Level <?php echo $senior_risk; ?></strong><?php endif; ?>
         </p>
@@ -265,18 +297,19 @@ function age($dob) {
     </div>
 </div>
 
-<?php if (!empty($seniors)): ?>
-<div class="card shadow-sm border-0">
+<?php if (!empty($paged_seniors)): ?>
+<div class="card shadow-sm border-0 senior-picker-card">
     <div class="card-header bg-white fw-semibold">
         <i class="bi bi-people-fill text-secondary"></i> Select a Senior
     </div>
-    <div class="list-group list-group-flush">
-        <?php foreach ($seniors as $s): ?>
+    <div class="list-group list-group-flush senior-list-scroll">
+        <?php foreach ($paged_seniors as $s): ?>
         <?php
             $full = htmlspecialchars($s['first_name'] . ' ' . $s['middle_name'] . ' ' . $s['last_name']);
             $pic  = $s['profile_path'] ? '../senior_profile_pics/' . htmlspecialchars($s['profile_path']) : '';
+            $list_query = seniorListQueryString($search, $senior_risk, $senior_page);
         ?>
-        <a href="?senior_id=<?php echo $s['senior_id']; ?>&tab=checkup<?php echo $search ? '&search='.urlencode($search) : ''; ?><?php echo $senior_risk > 0 ? '&senior_risk='.(int)$senior_risk : ''; ?>"
+        <a href="?senior_id=<?php echo $s['senior_id']; ?>&tab=checkup<?php echo $list_query !== '' ? '&' . $list_query : ''; ?>"
            class="list-group-item list-group-item-action d-flex align-items-center gap-3 senior-card">
             <?php if ($pic): ?>
             <img src="<?php echo $pic; ?>" class="avatar" alt="">
@@ -294,19 +327,45 @@ function age($dob) {
         </a>
         <?php endforeach; ?>
     </div>
+
+    <?php if ($total_pages > 1): ?>
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <small class="text-muted">Page <?php echo $senior_page; ?> of <?php echo $total_pages; ?></small>
+        <nav aria-label="Senior list pages">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item <?php echo $senior_page <= 1 ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="?<?php echo htmlspecialchars(seniorListQueryString($search, $senior_risk, max(1, $senior_page - 1))); ?>">Previous</a>
+                </li>
+                <?php for ($page_num = 1; $page_num <= $total_pages; $page_num++): ?>
+                <li class="page-item <?php echo $page_num === $senior_page ? 'active' : ''; ?>">
+                    <a class="page-link" href="?<?php echo htmlspecialchars(seniorListQueryString($search, $senior_risk, $page_num)); ?>"><?php echo $page_num; ?></a>
+                </li>
+                <?php endfor; ?>
+                <li class="page-item <?php echo $senior_page >= $total_pages ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="?<?php echo htmlspecialchars(seniorListQueryString($search, $senior_risk, min($total_pages, $senior_page + 1))); ?>">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <?php endif; ?>
 </div>
 <?php else: ?>
-<div class="text-center text-muted py-5">
-    <i class="bi bi-person-lines-fill fs-1 d-block mb-3" style="color:#667eea;opacity:.4;"></i>
-    <h5>Select a Senior</h5>
-    <p class="small">Search for a senior above to record a checkup.</p>
+<div class="card shadow-sm border-0 senior-picker-card">
+    <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-people-fill text-secondary"></i> Select a Senior
+    </div>
+    <div class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted">
+        <i class="bi bi-person-lines-fill fs-1 d-block mb-3" style="color:#667eea;opacity:.4;"></i>
+        <h5>Select a Senior</h5>
+        <p class="small mb-0">Search for a senior above to record a checkup.</p>
+    </div>
 </div>
 <?php endif; ?>
 
 <?php else: ?>
 
 <!-- ── Tab navigation ─────────────────────────────────────── -->
-<?php $base = '?senior_id='.$view_senior.($search?'&search='.urlencode($search):'').($senior_risk > 0 ? '&senior_risk='.(int)$senior_risk : ''); ?>
+<?php $base = '?senior_id='.$view_senior.($search?'&search='.urlencode($search):'').($senior_risk > 0 ? '&senior_risk='.(int)$senior_risk : '').($senior_page > 1 ? '&page='.(int)$senior_page : ''); ?>
 
 <!-- Senior name bar -->
 <div class="d-flex align-items-center gap-3 mb-3">
@@ -318,7 +377,7 @@ function age($dob) {
             <span class="badge bg-<?php echo $senior['is_alive']==='yes'?'success':'secondary'; ?>"><?php echo $senior['is_alive']==='yes'?'Alive':'Deceased'; ?></span>
         </div>
     </div>
-    <a href="?<?php echo ($search ? 'search='.urlencode($search) : '').($search && $senior_risk > 0 ? '&' : '').($senior_risk > 0 ? 'senior_risk='.(int)$senior_risk : ''); ?>" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-arrow-left"></i> Back to list</a>
+    <a href="?<?php echo htmlspecialchars(seniorListQueryString($search, $senior_risk, $senior_page)); ?>" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-arrow-left"></i> Back to list</a>
 </div>
 
 <ul class="nav nav-tabs mb-4">

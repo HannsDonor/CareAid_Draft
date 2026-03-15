@@ -32,7 +32,12 @@ if (isset($conn) && ($conn instanceof mysqli)) {
     }
 }
 
-$mednav_unread_count = count($mednav_notifications);
+$mednav_unread_count = 0;
+foreach ($mednav_notifications as $notification) {
+    if (strtolower((string)($notification['status'] ?? '')) !== 'read') {
+        $mednav_unread_count++;
+    }
+}
 
 function _nav_link(string $href, string $icon, string $label, string $current): string {
     $base = basename($href);
@@ -191,7 +196,7 @@ function _nav_link(string $href, string $icon, string $label, string $current): 
     <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="medNavNotificationsModalLabel"><i class="bi bi-bell me-2"></i>Recent Notifications</h5>
+                <h5 class="modal-title" id="medNavNotificationsModalLabel"><i class="bi bi-bell me-2"></i> Notifications</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">

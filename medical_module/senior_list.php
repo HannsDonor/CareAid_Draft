@@ -457,12 +457,14 @@ $search = trim($_GET['search'] ?? '');
 $gender = $_GET['gender'] ?? '';
 $alive = $_GET['alive'] ?? '';
 $priority_min = (int)($_GET['priority_min'] ?? 0);
+$page = (int)($_GET['page'] ?? 1);
 $selected_id = (int)($_GET['senior_id'] ?? 0);
 $tab = $_GET['tab'] ?? 'profile';
 
 if (!in_array($gender, ['', 'Male', 'Female'], true)) $gender = '';
 if (!in_array($alive, ['', 'yes', 'no'], true)) $alive = '';
 if ($priority_min < 0 || $priority_min > 5) $priority_min = 0;
+if ($page < 1) $page = 1;
 if (!in_array($tab, ['profile', 'health', 'checkups'], true)) $tab = 'profile';
 
 $flash_updated = isset($_GET['updated']);
@@ -510,6 +512,28 @@ if ($stmt) {
         $senior_rows[] = $row;
     }
     $stmt->close();
+}
+
+$seniors_per_page = 4;
+$total_seniors = count($senior_rows);
+$total_pages = max(1, (int)ceil($total_seniors / $seniors_per_page));
+if ($page > $total_pages) {
+    $page = $total_pages;
+}
+$page_offset = ($page - 1) * $seniors_per_page;
+$paged_senior_rows = array_slice($senior_rows, $page_offset, $seniors_per_page);
+
+function senior_list_query_string(string $search, string $gender, string $alive, int $priority_min, int $page = 1): string {
+    $params = [
+        'search' => $search,
+        'gender' => $gender,
+        'alive' => $alive,
+        'priority_min' => $priority_min,
+    ];
+    if ($page > 1) {
+        $params['page'] = $page;
+    }
+    return http_build_query($params);
 }
 
 $selected_senior = null;
@@ -562,10 +586,7 @@ if ($selected_id > 0) {
     }
 }
 
-$qs_filter = 'search=' . urlencode($search)
-    . '&gender=' . urlencode($gender)
-    . '&alive=' . urlencode($alive)
-    . '&priority_min=' . $priority_min;
+$qs_filter = senior_list_query_string($search, $gender, $alive, $priority_min, $page);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -584,7 +605,15 @@ $qs_filter = 'search=' . urlencode($search)
 .senior-list-item.active { background: #eef5ff; border-left-color: #0d6efd; color: #0d6efd; }
 .senior-list-item.active .fw-semibold { color: #0d6efd; }
 .senior-list-item:hover:not(.active) { background: #f8f9ff; }
-.senior-list-scroll { max-height: 360px; overflow-y: auto; }
+.senior-list-scroll {
+    overflow: visible;
+}
+.senior-list-empty {
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
 .detail-card { border: none; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.07); }
 .profile-pic-lg { width: 90px; height: 90px; object-fit: cover; border-radius: 50%; border: 3px solid #dee2e6; }
@@ -683,13 +712,13 @@ $qs_filter = 'search=' . urlencode($search)
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <span class="fw-semibold"><i class="bi bi-people me-1"></i> Seniors</span>
-                        <span class="badge bg-secondary"><?php echo count($senior_rows); ?></span>
+                        <span class="badge bg-secondary"><?php echo $total_seniors; ?></span>
                     </div>
                     <div class="list-group list-group-flush senior-list-scroll">
-                        <?php if (empty($senior_rows)): ?>
-                            <div class="p-4 text-center text-muted"><i class="bi bi-search fs-3 d-block mb-2"></i>No seniors found.</div>
+                        <?php if (empty($paged_senior_rows)): ?>
+                            <div class="p-4 text-center text-muted senior-list-empty"><div><i class="bi bi-search fs-3 d-block mb-2"></i>No seniors found.</div></div>
                         <?php else: ?>
-                            <?php foreach ($senior_rows as $s): ?>
+                            <?php foreach ($paged_senior_rows as $s): ?>
                                 <?php $is_active = ((int)$s['senior_id'] === $selected_id); ?>
                                 <a class="list-group-item list-group-item-action senior-list-item <?php echo $is_active ? 'active' : ''; ?>" href="?senior_id=<?php echo (int)$s['senior_id']; ?>&tab=profile&<?php echo $qs_filter; ?>">
                                     <div class="fw-semibold"><?php echo htmlspecialchars($s['last_name'] . ', ' . $s['first_name'] . ($s['middle_name'] ? ' ' . $s['middle_name'] : '')); ?></div>
@@ -700,6 +729,26 @@ $qs_filter = 'search=' . urlencode($search)
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
+                    <?php if ($total_pages > 1): ?>
+                    <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <small class="text-muted">Page <?php echo $page; ?> of <?php echo $total_pages; ?></small>
+                        <nav aria-label="Senior list pages">
+                            <ul class="pagination pagination-sm mb-0">
+                                <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                    <a class="page-link" href="?<?php echo htmlspecialchars(senior_list_query_string($search, $gender, $alive, $priority_min, max(1, $page - 1))); ?>">Previous</a>
+                                </li>
+                                <?php for ($page_num = 1; $page_num <= $total_pages; $page_num++): ?>
+                                <li class="page-item <?php echo $page_num === $page ? 'active' : ''; ?>">
+                                    <a class="page-link" href="?<?php echo htmlspecialchars(senior_list_query_string($search, $gender, $alive, $priority_min, $page_num)); ?>"><?php echo $page_num; ?></a>
+                                </li>
+                                <?php endfor; ?>
+                                <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                                    <a class="page-link" href="?<?php echo htmlspecialchars(senior_list_query_string($search, $gender, $alive, $priority_min, min($total_pages, $page + 1))); ?>">Next</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 

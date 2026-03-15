@@ -166,16 +166,6 @@ body {
 	color: var(--text-deep);
 }
 .dash-wrap { max-width: 1180px; margin: 0 auto; padding: 22px 18px 32px; }
-.topbar {
-	background: #fff;
-	border-radius: 16px;
-	padding: 14px 18px;
-	box-shadow: 0 10px 30px rgba(18, 38, 56, 0.08);
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 14px;
-}
 .hero {
 	margin-top: 16px;
 	background: linear-gradient(135deg, var(--brand-blue), var(--brand-mint));
@@ -225,54 +215,76 @@ body {
 .data-label { color: #5f7283; font-size: .8rem; }
 .table thead th { white-space: nowrap; font-size: .82rem; }
 .table tbody td { font-size: .88rem; vertical-align: middle; }
-.assist-toggle {
-	position: fixed;
-	right: 18px;
-	bottom: 74px;
-	z-index: 1040;
-	border: 0;
-	border-radius: 999px;
-	width: 206px;
-	padding: 11px 16px;
-	background: linear-gradient(135deg, #c96a2f, #e49b47);
-	color: #fff;
-	box-shadow: 0 14px 28px rgba(23, 48, 66, 0.22);
-	font-weight: 600;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
-	transition: transform .18s ease, box-shadow .18s ease;
-}
-.assist-toggle:hover {
-	transform: translateY(-2px);
-	box-shadow: 0 18px 34px rgba(23, 48, 66, 0.26);
-	color: #fff;
-}
-.quick-guide-toggle {
+.fab-wrap {
 	position: fixed;
 	right: 18px;
 	bottom: 18px;
 	z-index: 1040;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 10px;
+}
+.fab-actions {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 9px;
+	pointer-events: none;
+}
+.fab-action {
 	border: 0;
 	border-radius: 999px;
-	width: 206px;
-	padding: 11px 16px;
-	background: linear-gradient(135deg, var(--brand-blue), var(--brand-mint));
+	padding: 9px 13px;
+	width: 156px;
 	color: #fff;
-	box-shadow: 0 14px 28px rgba(23, 48, 66, 0.24);
 	font-weight: 600;
+	font-size: .82rem;
+	box-shadow: 0 10px 22px rgba(23, 48, 66, 0.2);
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 7px;
+	transform: translateY(10px) scale(.92);
+	opacity: 0;
+	visibility: hidden;
+	transition: transform .18s ease, opacity .18s ease, visibility .18s ease;
+}
+.fab-action-assist {
+	background: linear-gradient(135deg, #c96a2f, #e49b47);
+}
+.fab-action-guide {
+	background: linear-gradient(135deg, var(--brand-blue), var(--brand-mint));
+}
+.fab-action-settings {
+	background: linear-gradient(135deg, #6c757d, #495057);
+}
+.fab-main {
+	border: 0;
+	border-radius: 50%;
+	width: 54px;
+	height: 54px;
+	background: linear-gradient(135deg, #1f5d8a, #2b9e8f);
+	color: #fff;
+	font-size: 1.32rem;
+	box-shadow: 0 14px 30px rgba(23, 48, 66, 0.24);
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 8px;
 	transition: transform .18s ease, box-shadow .18s ease;
-	text-decoration: none;
 }
-.quick-guide-toggle:hover {
+.fab-main:hover {
 	transform: translateY(-2px);
 	box-shadow: 0 18px 34px rgba(23, 48, 66, 0.28);
-	color: #fff;
+}
+.fab-wrap.is-open .fab-action {
+	transform: translateY(0) scale(1);
+	opacity: 1;
+	visibility: visible;
+	pointer-events: auto;
+}
+.fab-wrap.is-open .fab-main {
+	transform: rotate(45deg);
 }
 .quick-guide-modal .modal-content {
 	border: 0;
@@ -299,36 +311,28 @@ body {
 @media (max-width: 768px) {
 	.hero-grid { grid-template-columns: 1fr; text-align: center; }
 	.avatar, .avatar-fallback { margin: 0 auto; }
-	.quick-guide-toggle {
+	.fab-wrap {
 		right: 12px;
 		bottom: 12px;
 	}
-	.assist-toggle {
-		right: 12px;
-		bottom: 66px;
+	.fab-action {
+		width: 148px;
+		font-size: .78rem;
+		padding: 8px 12px;
 	}
 }
 </style>
 </head>
 <body>
+<?php $snav_show_bottom = false; include 'senior_nav.php'; ?>
 <div class="dash-wrap">
-	<div class="topbar">
-		<div>
-			<h5 class="mb-0 fw-bold">Senior Dashboard</h5>
-			<small class="text-muted"><?php echo date('l, F j, Y'); ?></small>
-		</div>
-		<div class="d-flex align-items-center gap-2">
-			<span class="badge text-bg-light border"><i class="bi bi-person-check me-1"></i><?php echo htmlspecialchars($username); ?></span>
-			<a href="../auth_module/logout.php" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Logout</a>
-		</div>
-	</div>
 
 	<?php if (!$senior): ?>
 	<div class="card card-soft mt-4">
 		<div class="card-body text-center py-5">
 			<i class="bi bi-person-x fs-1 d-block mb-2 text-secondary"></i>
-			<h5 class="fw-semibold">Senior Profile Not Found</h5>
-			<p class="text-muted mb-0">Your account is active, but no linked senior profile is available yet. Please contact a health worker.</p>
+			<h5 class="fw-semibold" data-i18n="profileNotFoundTitle">Senior Profile Not Found</h5>
+			<p class="text-muted mb-0" data-i18n="profileNotFoundBody">Your account is active, but no linked senior profile is available yet. Please contact a health worker.</p>
 		</div>
 	</div>
 	<?php else: ?>
@@ -348,7 +352,7 @@ body {
 						<?php echo (($senior['is_alive'] ?? 'yes') === 'yes') ? 'Active Profile' : 'Inactive Profile'; ?>
 					</span>
 				</div>
-				<small class="opacity-75">Welcome back. This page summarizes your profile details and latest health checkups.</small>
+				<small class="opacity-75" data-i18n="welcomeSummary">Welcome back. This page summarizes your profile details and latest health checkups.</small>
 			</div>
 		</div>
 	</section>
@@ -357,14 +361,14 @@ body {
 		<div class="col-12">
 			<div class="card card-soft h-100">
 				<div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-					<span><i class="bi bi-megaphone-fill text-danger me-1"></i>Barangay Announcements</span>
+					<span><i class="bi bi-megaphone-fill text-danger me-1"></i><span data-i18n="barangayAnnouncements">Barangay Announcements</span></span>
 					<span class="badge bg-secondary"><?php echo count($active_announcements); ?></span>
 				</div>
 				<div class="card-body">
 					<?php if (empty($active_announcements)): ?>
 						<div class="text-center text-muted py-5">
 							<i class="bi bi-inbox fs-2 d-block mb-2"></i>
-							No active announcements at the moment.
+							<span data-i18n="noActiveAnnouncements">No active announcements at the moment.</span>
 						</div>
 					<?php else: ?>
 						<div class="d-flex flex-column gap-3">
@@ -385,7 +389,7 @@ body {
 											<small class="text-muted d-block"><?php echo htmlspecialchars((string)$ann['caption']); ?></small>
 										<?php endif; ?>
 									<?php endif; ?>
-									<small class="text-muted">Expires: <?php echo htmlspecialchars((string)($ann['expires_at'] ?? 'No expiry')); ?></small>
+									<small class="text-muted"><span data-i18n="expiresPrefix">Expires:</span> <?php echo htmlspecialchars((string)($ann['expires_at'] ?? 'No expiry')); ?></small>
 								</div>
 							<?php endforeach; ?>
 						</div>
@@ -397,22 +401,32 @@ body {
 	<?php endif; ?>
 </div>
 
-<button type="button" class="assist-toggle" data-bs-toggle="modal" data-bs-target="#requestAssistanceModal">
-	<i class="bi bi-life-preserver"></i>
-	<span>Request Assistance</span>
-</button>
-
-<button type="button" class="quick-guide-toggle" data-bs-toggle="modal" data-bs-target="#quickGuidanceModal">
-	<i class="bi bi-heart-pulse-fill"></i>
-	<span>Quick Check Up</span>
-</button>
+<div class="fab-wrap" id="quickFabWrap">
+	<div class="fab-actions">
+		<button type="button" class="fab-action fab-action-assist" data-bs-toggle="modal" data-bs-target="#requestAssistanceModal" aria-label="Request Assistance">
+			<i class="bi bi-life-preserver"></i>
+			<span data-i18n="fabAssistance">Assistance</span>
+		</button>
+		<button type="button" class="fab-action fab-action-guide" data-bs-toggle="modal" data-bs-target="#quickGuidanceModal" aria-label="Quick Check Up">
+			<i class="bi bi-heart-pulse-fill"></i>
+			<span data-i18n="fabQuickCheck">Quick Check</span>
+		</button>
+		<button type="button" class="fab-action fab-action-settings" data-bs-toggle="modal" data-bs-target="#displaySettingsModal" aria-label="Settings">
+			<i class="bi bi-gear-fill"></i>
+			<span data-i18n="fabSettings">Settings</span>
+		</button>
+	</div>
+	<button type="button" class="fab-main" id="quickFabMain" aria-label="Open quick actions" aria-expanded="false" aria-controls="quickFabWrap">
+		<i class="bi bi-plus-lg"></i>
+	</button>
+</div>
 
 <div class="modal fade quick-guide-modal" id="requestAssistanceModal" tabindex="-1" aria-labelledby="requestAssistanceModalLabel" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered modal-md">
 		<div class="modal-content">
 			<div class="modal-header">
 				<div>
-					<h5 class="modal-title fw-bold" id="requestAssistanceModalLabel">Request Assistance</h5>
+					<h5 class="modal-title fw-bold" id="requestAssistanceModalLabel" data-i18n="requestAssistanceTitle">Request Assistance</h5>
 				</div>
 				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 			</div>
@@ -428,7 +442,7 @@ body {
 		<div class="modal-content">
 			<div class="modal-header">
 				<div>
-					<h5 class="modal-title fw-bold" id="quickGuidanceModalLabel">Quick Check Up</h5>
+					<h5 class="modal-title fw-bold" id="quickGuidanceModalLabel" data-i18n="quickCheckTitle">Quick Check Up</h5>
 				</div>
 				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 			</div>
@@ -438,6 +452,143 @@ body {
 		</div>
 	</div>
 </div>
+
+<div class="modal fade quick-guide-modal" id="displaySettingsModal" tabindex="-1" aria-labelledby="displaySettingsModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-sm">
+		<div class="modal-content">
+			<div class="modal-header">
+				<div>
+					<h5 class="modal-title fw-bold" id="displaySettingsModalLabel" data-i18n="settingsTitle">Settings</h5>
+				</div>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<div class="mb-3">
+					<label for="fontSizeRange" class="form-label fw-semibold" data-i18n="fontSizeLabel">Text size</label>
+					<input type="range" class="form-range" min="90" max="125" step="5" value="100" id="fontSizeRange">
+					<div class="small text-muted"><span data-i18n="fontSizeCurrent">Current:</span> <span id="fontSizeValue">100%</span></div>
+				</div>
+				<div>
+					<label for="languageSelect" class="form-label fw-semibold" data-i18n="languageLabel">Language</label>
+					<select id="languageSelect" class="form-select">
+						<option value="en">English</option>
+						<option value="tl">Tagalog</option>
+					</select>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+const quickFabWrap = document.getElementById('quickFabWrap');
+const quickFabMain = document.getElementById('quickFabMain');
+const fontSizeRange = document.getElementById('fontSizeRange');
+const fontSizeValue = document.getElementById('fontSizeValue');
+const languageSelect = document.getElementById('languageSelect');
+
+const i18nMap = {
+	en: {
+		profileNotFoundTitle: 'Senior Profile Not Found',
+		profileNotFoundBody: 'Your account is active, but no linked senior profile is available yet. Please contact a health worker.',
+		welcomeSummary: 'Welcome back. This page summarizes your profile details and latest health checkups.',
+		barangayAnnouncements: 'Barangay Announcements',
+		noActiveAnnouncements: 'No active announcements at the moment.',
+		expiresPrefix: 'Expires:',
+		fabAssistance: 'Assistance',
+		fabQuickCheck: 'Quick Check',
+		fabSettings: 'Settings',
+		requestAssistanceTitle: 'Request Assistance',
+		quickCheckTitle: 'Quick Check Up',
+		settingsTitle: 'Settings',
+		fontSizeLabel: 'Text size',
+		fontSizeCurrent: 'Current:',
+		languageLabel: 'Language'
+	},
+	tl: {
+		profileNotFoundTitle: 'Walang Nakitang Senior Profile',
+		profileNotFoundBody: 'Aktibo ang iyong account ngunit wala pang nakalink na senior profile. Makipag-ugnayan sa health worker.',
+		welcomeSummary: 'Maligayang pagbabalik. Ipinapakita sa pahinang ito ang buod ng iyong profile at pinakabagong checkup.',
+		barangayAnnouncements: 'Mga Anunsyo ng Barangay',
+		noActiveAnnouncements: 'Wala pang aktibong anunsyo sa ngayon.',
+		expiresPrefix: 'Magtatapos:',
+		fabAssistance: 'Tulong',
+		fabQuickCheck: 'Mabilis na Check',
+		fabSettings: 'Settings',
+		requestAssistanceTitle: 'Humiling ng Tulong',
+		quickCheckTitle: 'Mabilis na Check Up',
+		settingsTitle: 'Settings',
+		fontSizeLabel: 'Laki ng Teksto',
+		fontSizeCurrent: 'Kasalukuyan:',
+		languageLabel: 'Wika'
+	}
+};
+
+function applyFontScale(scale) {
+	const safeScale = Number(scale) || 100;
+	document.documentElement.style.fontSize = safeScale + '%';
+	if (fontSizeValue) {
+		fontSizeValue.textContent = safeScale + '%';
+	}
+	if (fontSizeRange && String(fontSizeRange.value) !== String(safeScale)) {
+		fontSizeRange.value = String(safeScale);
+	}
+	localStorage.setItem('seniorFontScale', String(safeScale));
+}
+
+function applyLanguage(lang) {
+	const safeLang = i18nMap[lang] ? lang : 'en';
+	const dict = i18nMap[safeLang];
+	document.querySelectorAll('[data-i18n]').forEach(function (element) {
+		const key = element.getAttribute('data-i18n');
+		if (key && Object.prototype.hasOwnProperty.call(dict, key)) {
+			element.textContent = dict[key];
+		}
+	});
+	if (languageSelect) {
+		languageSelect.value = safeLang;
+	}
+	localStorage.setItem('seniorLanguage', safeLang);
+}
+
+if (quickFabWrap && quickFabMain) {
+	quickFabMain.addEventListener('click', function () {
+		const isOpen = quickFabWrap.classList.toggle('is-open');
+		quickFabMain.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+	});
+
+	document.addEventListener('click', function (event) {
+		if (!quickFabWrap.contains(event.target)) {
+			quickFabWrap.classList.remove('is-open');
+			quickFabMain.setAttribute('aria-expanded', 'false');
+		}
+	});
+
+	quickFabWrap.querySelectorAll('.fab-action').forEach(function (action) {
+		action.addEventListener('click', function () {
+			quickFabWrap.classList.remove('is-open');
+			quickFabMain.setAttribute('aria-expanded', 'false');
+		});
+	});
+}
+
+if (fontSizeRange) {
+	fontSizeRange.addEventListener('input', function () {
+		applyFontScale(fontSizeRange.value);
+	});
+}
+
+if (languageSelect) {
+	languageSelect.addEventListener('change', function () {
+		applyLanguage(languageSelect.value);
+	});
+}
+
+const savedScale = localStorage.getItem('seniorFontScale') || '100';
+const savedLang = localStorage.getItem('seniorLanguage') || 'en';
+applyFontScale(savedScale);
+applyLanguage(savedLang);
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

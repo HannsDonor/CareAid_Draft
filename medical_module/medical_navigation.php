@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $_nav_current = basename($_SERVER['PHP_SELF']);
+$mednav_account_id = (int)($_SESSION['account_id'] ?? 0);
 
 $mednav_notifications = [];
 $mednav_notification_error = '';
@@ -13,20 +14,29 @@ if (!isset($conn) || !($conn instanceof mysqli)) {
     @include '../db_config/connection_db.php';
 }
 
-if (isset($conn) && ($conn instanceof mysqli)) {
-    $mednav_notif_sql = "SELECT n.notification_id, n.title, n.message, n.status, n.created_at,
-                                sp.first_name, sp.last_name
-                         FROM notifications n
-                         LEFT JOIN senior_profiles sp ON sp.senior_id = n.senior_id
-                                                 WHERE n.notification_type = 'assistance'
-                         ORDER BY n.created_at DESC, n.notification_id DESC
-                         LIMIT 8";
+if (isset($conn) && ($conn instanceof mysqli) && $mednav_account_id > 0) {
+    $mednav_notif_stmt = $conn->prepare(
+        "SELECT n.notification_id, n.title, n.message, n.status, n.created_at,
+                sp.first_name, sp.last_name
+         FROM notifications n
+         LEFT JOIN senior_profiles sp ON sp.account_id = n.account_id
+         WHERE n.notification_type = 'assistance'
+           AND n.account_id = ?
+           AND n.is_deleted = 0
+         ORDER BY n.created_at DESC, n.notification_id DESC
+         LIMIT 8"
+    );
 
-    $mednav_notif_res = $conn->query($mednav_notif_sql);
-    if ($mednav_notif_res) {
-        while ($row = $mednav_notif_res->fetch_assoc()) {
-            $mednav_notifications[] = $row;
+    if ($mednav_notif_stmt) {
+        $mednav_notif_stmt->bind_param('i', $mednav_account_id);
+        $mednav_notif_stmt->execute();
+        $mednav_notif_res = $mednav_notif_stmt->get_result();
+        if ($mednav_notif_res) {
+            while ($row = $mednav_notif_res->fetch_assoc()) {
+                $mednav_notifications[] = $row;
+            }
         }
+        $mednav_notif_stmt->close();
     } else {
         $mednav_notification_error = 'Notifications are unavailable.';
     }
@@ -34,7 +44,7 @@ if (isset($conn) && ($conn instanceof mysqli)) {
 
 $mednav_unread_count = 0;
 foreach ($mednav_notifications as $notification) {
-    if (strtolower((string)($notification['status'] ?? '')) !== 'read') {
+    if (strtolower((string)($notification['status'] ?? '')) === 'unread') {
         $mednav_unread_count++;
     }
 }

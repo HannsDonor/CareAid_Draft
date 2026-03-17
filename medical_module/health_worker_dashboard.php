@@ -7,6 +7,8 @@ if (!isset($_SESSION['account_id'])) {
     exit;
 }
 
+$account_id = (int)($_SESSION['account_id'] ?? 0);
+
 function scalar_value(mysqli $conn, string $sql, int $default = 0): int {
     $res = $conn->query($sql);
     if (!$res) {
@@ -59,7 +61,18 @@ $totalAssistanceRequests = scalar_value($conn, "SELECT COUNT(*) FROM assistance_
 $pendingAssistance = scalar_value($conn, "SELECT COUNT(*) FROM assistance_requests WHERE status = 'pending'");
 $inProgressAssistance = scalar_value($conn, "SELECT COUNT(*) FROM assistance_requests WHERE status = 'in_progress'");
 $completedAssistance = scalar_value($conn, "SELECT COUNT(*) FROM assistance_requests WHERE status = 'completed'");
-$unreadNotifications = scalar_value($conn, "SELECT COUNT(*) FROM notifications WHERE notification_type = 'assistance' AND LOWER(COALESCE(status,'')) <> 'read'");
+$unreadNotifications = 0;
+$notif_cnt_stmt = $conn->prepare("SELECT COUNT(*) AS c FROM notifications WHERE notification_type = 'assistance' AND account_id = ? AND is_deleted = 0 AND status = 'unread'");
+if ($notif_cnt_stmt) {
+    $notif_cnt_stmt->bind_param('i', $account_id);
+    $notif_cnt_stmt->execute();
+    $notif_cnt_res = $notif_cnt_stmt->get_result();
+    if ($notif_cnt_res) {
+        $notif_cnt_row = $notif_cnt_res->fetch_assoc();
+        $unreadNotifications = (int)($notif_cnt_row['c'] ?? 0);
+    }
+    $notif_cnt_stmt->close();
+}
 
 // Priority distribution
 $priorityDist = [];

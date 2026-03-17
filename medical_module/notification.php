@@ -14,6 +14,8 @@ if (!isset($conn) || !($conn instanceof mysqli)) {
     exit;
 }
 
+$account_id = (int)($_SESSION['account_id'] ?? 0);
+
 $action = (string)($_POST['action'] ?? '');
 if (!in_array($action, ['mark_read', 'remove'], true)) {
     echo json_encode(['ok' => false, 'message' => 'Invalid action']);
@@ -27,20 +29,20 @@ if ($notification_id <= 0) {
 }
 
 if ($action === 'mark_read') {
-    $stmt = $conn->prepare("UPDATE notifications SET status = 'read' WHERE notification_id = ? AND notification_type = 'assistance' LIMIT 1");
+    $stmt = $conn->prepare("UPDATE notifications SET status = 'read' WHERE notification_id = ? AND notification_type = 'assistance' AND account_id = ? AND is_deleted = 0 LIMIT 1");
     if (!$stmt) {
         echo json_encode(['ok' => false, 'message' => 'Failed to prepare read update']);
         exit;
     }
 } else {
-    $stmt = $conn->prepare("DELETE FROM notifications WHERE notification_id = ? AND notification_type = 'assistance' LIMIT 1");
+    $stmt = $conn->prepare("UPDATE notifications SET is_deleted = 1 WHERE notification_id = ? AND notification_type = 'assistance' AND account_id = ? AND is_deleted = 0 LIMIT 1");
     if (!$stmt) {
         echo json_encode(['ok' => false, 'message' => 'Failed to prepare remove']);
         exit;
     }
 }
 
-$stmt->bind_param('i', $notification_id);
+$stmt->bind_param('ii', $notification_id, $account_id);
 $ok = $stmt->execute();
 $stmt->close();
 
@@ -50,10 +52,16 @@ if (!$ok) {
 }
 
 $unread_count = 0;
-$cnt_res = $conn->query("SELECT COUNT(*) AS c FROM notifications WHERE notification_type = 'assistance' AND LOWER(COALESCE(status, '')) <> 'read'");
-if ($cnt_res) {
-    $cnt_row = $cnt_res->fetch_assoc();
-    $unread_count = (int)($cnt_row['c'] ?? 0);
+$cnt_stmt = $conn->prepare("SELECT COUNT(*) AS c FROM notifications WHERE notification_type = 'assistance' AND account_id = ? AND is_deleted = 0 AND status = 'unread'");
+if ($cnt_stmt) {
+    $cnt_stmt->bind_param('i', $account_id);
+    $cnt_stmt->execute();
+    $cnt_result = $cnt_stmt->get_result();
+    if ($cnt_result) {
+        $cnt_row = $cnt_result->fetch_assoc();
+        $unread_count = (int)($cnt_row['c'] ?? 0);
+    }
+    $cnt_stmt->close();
 }
 
 echo json_encode([

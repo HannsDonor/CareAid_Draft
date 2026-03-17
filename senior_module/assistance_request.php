@@ -92,28 +92,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 					$notification_message = ucfirst($form_assist_type) . ' assistance request submitted on ' . $display_date . ' at ' . $display_time . '. Status: pending.';
 				}
 
-				$notif_stmt = $conn->prepare(
-					"INSERT INTO notifications (senior_id, notification_type, assistance_type, title, message, status, created_at)
-					 VALUES (?, 'assistance', ?, ?, ?, 'unread', NOW())"
+				$receivers = [];
+				$recv_stmt = $conn->prepare(
+					"SELECT account_id
+					 FROM accounts
+					 WHERE role IN ('health_worker', 'admin')
+					   AND LOWER(COALESCE(account_status, 'active')) = 'active'"
 				);
 
-				if (!$notif_stmt) {
+				if (!$recv_stmt) {
 					$conn->rollback();
-					$error_message = 'Request saved but notification could not be prepared.';
+					$error_message = 'Request saved but receiver lookup failed.';
 				} else {
-					$notif_stmt->bind_param('isss', $senior_id, $form_assist_type, $notification_title, $notification_message);
-					if (!$notif_stmt->execute()) {
-						$notif_stmt->close();
+					$recv_stmt->execute();
+					$recv_res = $recv_stmt->get_result();
+					if ($recv_res) {
+						while ($recv_row = $recv_res->fetch_assoc()) {
+							$receiver_id = (int)($recv_row['account_id'] ?? 0);
+							if ($receiver_id > 0) {
+								$receivers[] = $receiver_id;
+							}
+						}
+					}
+					$recv_stmt->close();
+
+					if (count($receivers) === 0) {
 						$conn->rollback();
-						$error_message = 'Request saved but notification could not be created.';
+						$error_message = 'Request saved but no active receivers were found.';
 					} else {
-						$notif_stmt->close();
-						$conn->commit();
-						$success_message = 'Request submitted successfully. Status is pending.';
-						$form_assist_type = '';
-						$form_medical_mode = '';
-						$form_sched_date = '';
-						$form_sched_time = '';
+						$notif_stmt = $conn->prepare(
+							"INSERT INTO notifications (account_id, notification_type, assistance_type, title, message)
+							 VALUES (?, 'assistance', ?, ?, ?)"
+						);
+
+						if (!$notif_stmt) {
+							$conn->rollback();
+							$error_message = 'Request saved but notification could not be prepared.';
+						} else {
+							$notif_failed = false;
+							foreach ($receivers as $receiver_account_id) {
+								$notif_stmt->bind_param('isss', $receiver_account_id, $form_assist_type, $notification_title, $notification_message);
+								if (!$notif_stmt->execute()) {
+									$notif_failed = true;
+									break;
+								}
+							}
+
+							$notif_stmt->close();
+							if ($notif_failed) {
+								$conn->rollback();
+								$error_message = 'Request saved but notification could not be created.';
+							} else {
+								$conn->commit();
+								$success_message = 'Request submitted successfully. Status is pending.';
+								$form_assist_type = '';
+								$form_medical_mode = '';
+								$form_sched_date = '';
+								$form_sched_time = '';
+							}
+						}
 					}
 				}
 			}

@@ -7,115 +7,22 @@ if (!isset($_SESSION['account_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 	exit;
 }
 
-$admin_account_id = (int)($_SESSION['account_id'] ?? 0);
-$flash_type = '';
-$flash_msg = '';
+$counts = [
+	'total' => 0,
+	'active' => 0,
+	'inactive' => 0,
+];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_announcement') {
-	$title = trim($_POST['title'] ?? '');
-	$message = trim($_POST['message'] ?? '');
-	$expires_at = trim($_POST['expires_at'] ?? '');
-	$status = trim($_POST['status'] ?? 'active');
-	$caption = trim($_POST['caption'] ?? '');
-
-	if (!in_array($status, ['active', 'inactive'], true)) {
-		$status = 'active';
-	}
-
-	if ($title === '' || $message === '') {
-		$flash_type = 'danger';
-		$flash_msg = 'Title and message are required.';
-	} else {
-		if ($expires_at === '') {
-			$expires_at = null;
-		} else {
-			$dt = DateTime::createFromFormat('Y-m-d', $expires_at);
-			if (!$dt || $dt->format('Y-m-d') !== $expires_at) {
-				$flash_type = 'danger';
-				$flash_msg = 'Invalid expiration date format.';
-			}
-		}
-
-		if ($flash_msg === '') {
-			$ins = $conn->prepare(
-				"INSERT INTO announcements (admin_account_id, title, message, posted_at, expires_at, status)
-				 VALUES (?, ?, ?, NOW(), ?, ?)"
-			);
-
-			if (!$ins) {
-				$flash_type = 'danger';
-				$flash_msg = 'Failed to prepare announcement insert.';
-			} else {
-				$ins->bind_param('issss', $admin_account_id, $title, $message, $expires_at, $status);
-				$ok = $ins->execute();
-				$announcement_id = (int)$ins->insert_id;
-				$ins->close();
-
-				if (!$ok || $announcement_id <= 0) {
-					$flash_type = 'danger';
-					$flash_msg = 'Failed to save announcement.';
-				} else {
-					// Optional announcement image upload.
-					if (isset($_FILES['picture']) && ($_FILES['picture']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-						if (($_FILES['picture']['error'] ?? UPLOAD_ERR_OK) === UPLOAD_ERR_OK) {
-							$tmp = $_FILES['picture']['tmp_name'];
-							$size = (int)($_FILES['picture']['size'] ?? 0);
-							$orig = (string)($_FILES['picture']['name'] ?? '');
-							$ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
-							$allowed = ['jpg', 'jpeg', 'png', 'webp'];
-
-							if ($size <= 5 * 1024 * 1024 && in_array($ext, $allowed, true) && @getimagesize($tmp) !== false) {
-								$upload_dir = __DIR__ . '/../announcement_pictures';
-								if (!is_dir($upload_dir)) {
-									@mkdir($upload_dir, 0777, true);
-								}
-
-								if (is_dir($upload_dir)) {
-									$filename = 'announcement_' . $announcement_id . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
-									$target = $upload_dir . DIRECTORY_SEPARATOR . $filename;
-									if (move_uploaded_file($tmp, $target)) {
-										$pic_path = $filename;
-										$pic_ins = $conn->prepare(
-											"INSERT INTO announcement_pictures (announcement_id, picture_path, caption, uploaded_at)
-											 VALUES (?, ?, ?, NOW())"
-										);
-										if ($pic_ins) {
-											$pic_ins->bind_param('iss', $announcement_id, $pic_path, $caption);
-											$pic_ins->execute();
-											$pic_ins->close();
-										}
-									}
-								}
-							}
-						}
-					}
-
-					$flash_type = 'success';
-					$flash_msg = 'Announcement posted successfully.';
-				}
-			}
-		}
-	}
-}
-
-$announcements = [];
-$list_sql = "SELECT a.announcement_id, a.title, a.message, a.posted_at, a.expires_at, a.status,
-					ap.picture_path, ap.caption
-			 FROM announcements a
-			 LEFT JOIN announcement_pictures ap
-			   ON ap.picture_id = (
-					SELECT ap2.picture_id
-					FROM announcement_pictures ap2
-					WHERE ap2.announcement_id = a.announcement_id
-					ORDER BY ap2.uploaded_at DESC
-					LIMIT 1
-			   )
-			 ORDER BY a.posted_at DESC";
-$res = $conn->query($list_sql);
-if ($res) {
-	while ($row = $res->fetch_assoc()) {
-		$announcements[] = $row;
-	}
+$count_sql = "SELECT
+				COUNT(*) AS total_count,
+				SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
+				SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactive_count
+			 FROM announcements";
+$count_res = $conn->query($count_sql);
+if ($count_res && ($row = $count_res->fetch_assoc())) {
+	$counts['total'] = (int)($row['total_count'] ?? 0);
+	$counts['active'] = (int)($row['active_count'] ?? 0);
+	$counts['inactive'] = (int)($row['inactive_count'] ?? 0);
 }
 ?>
 <!DOCTYPE html>
@@ -123,7 +30,7 @@ if ($res) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Announcements - CareAid</title>
+<title>Announcement Module - CareAid</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 <style>
@@ -185,11 +92,21 @@ if ($res) {
 	border-radius: 14px;
 	box-shadow: 0 4px 18px rgba(0,0,0,.07);
 }
-.announcement-pic {
-	width: 100%;
-	max-height: 210px;
-	object-fit: cover;
-	border-radius: 10px;
+.menu-card {
+	transition: transform .2s ease, box-shadow .2s ease;
+}
+.menu-card:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 10px 28px rgba(0,0,0,.12);
+}
+.menu-icon {
+	width: 52px;
+	height: 52px;
+	border-radius: 12px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.4rem;
 }
 </style>
 </head>
@@ -217,105 +134,66 @@ if ($res) {
 <div class="main-wrap">
 	<div class="topbar">
 		<div>
-			<h5 class="mb-0 fw-bold">Announcements</h5>
-			<small class="text-muted">Post updates for senior accounts</small>
+			<h5 class="mb-0 fw-bold">Announcement Module</h5>
+			<small class="text-muted">Choose what you want to do first</small>
 		</div>
 		<a href="../auth_module/logout.php" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Logout</a>
 	</div>
 
 	<div class="content-area">
-		<?php if ($flash_msg !== ''): ?>
-			<div class="alert alert-<?php echo htmlspecialchars($flash_type ?: 'info'); ?> alert-dismissible fade show" role="alert">
-				<?php echo htmlspecialchars($flash_msg); ?>
-				<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+		<div class="row g-3 mb-4">
+			<div class="col-md-4">
+				<div class="card card-soft p-3">
+					<div class="text-muted small">Total Announcements</div>
+					<div class="fs-4 fw-bold"><?php echo $counts['total']; ?></div>
+				</div>
 			</div>
-		<?php endif; ?>
-
-		<div class="card card-soft mb-4">
-			<div class="card-header bg-white fw-semibold"><i class="bi bi-plus-circle me-1"></i> Post Announcement</div>
-			<div class="card-body">
-				<form method="POST" enctype="multipart/form-data" class="row g-3">
-					<input type="hidden" name="action" value="add_announcement">
-
-					<div class="col-md-8">
-						<label class="form-label">Title *</label>
-						<input type="text" name="title" class="form-control" maxlength="150" required>
-					</div>
-
-					<div class="col-md-4">
-						<label class="form-label">Status *</label>
-						<select name="status" class="form-select" required>
-							<option value="active">Active</option>
-							<option value="inactive">Inactive</option>
-						</select>
-					</div>
-
-					<div class="col-12">
-						<label class="form-label">Message *</label>
-						<textarea name="message" class="form-control" rows="4" required></textarea>
-					</div>
-
-					<div class="col-md-4">
-						<label class="form-label">Expires At</label>
-						<input type="date" name="expires_at" class="form-control">
-					</div>
-
-					<div class="col-md-4">
-						<label class="form-label">Picture</label>
-						<input type="file" name="picture" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/*">
-					</div>
-
-					<div class="col-md-4">
-						<label class="form-label">Picture Caption</label>
-						<input type="text" name="caption" class="form-control" maxlength="255">
-					</div>
-
-					<div class="col-12 d-flex justify-content-end">
-						<button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Publish Announcement</button>
-					</div>
-				</form>
+			<div class="col-md-4">
+				<div class="card card-soft p-3">
+					<div class="text-muted small">Active</div>
+					<div class="fs-4 fw-bold text-success"><?php echo $counts['active']; ?></div>
+				</div>
+			</div>
+			<div class="col-md-4">
+				<div class="card card-soft p-3">
+					<div class="text-muted small">Inactive</div>
+					<div class="fs-4 fw-bold text-secondary"><?php echo $counts['inactive']; ?></div>
+				</div>
 			</div>
 		</div>
 
-		<div class="card card-soft">
-			<div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-				<span><i class="bi bi-megaphone me-1"></i> Published Announcements</span>
-				<span class="badge bg-secondary"><?php echo count($announcements); ?></span>
+		<div class="row g-3">
+			<div class="col-md-6 col-xl-3">
+				<div class="card card-soft menu-card h-100 p-3">
+					<div class="menu-icon bg-primary-subtle text-primary mb-3"><i class="bi bi-plus-circle"></i></div>
+					<h6 class="fw-semibold">Create Announcement</h6>
+					<p class="text-muted small mb-3">Post a new announcement with optional image.</p>
+					<a href="create_announcement.php" class="btn btn-primary btn-sm">Open</a>
+				</div>
 			</div>
-			<div class="card-body">
-				<?php if (empty($announcements)): ?>
-					<div class="text-center text-muted py-4">
-						<i class="bi bi-inbox fs-2 d-block mb-2"></i>
-						No announcements posted yet.
-					</div>
-				<?php else: ?>
-					<div class="row g-3">
-						<?php foreach ($announcements as $a): ?>
-							<?php
-								$pic_name = trim((string)($a['picture_path'] ?? ''));
-								$pic_url = $pic_name !== '' ? '../announcement_pictures/' . basename(str_replace('\\', '/', $pic_name)) : '';
-								$is_active = ((string)($a['status'] ?? 'inactive') === 'active');
-							?>
-							<div class="col-md-6 col-xl-4">
-								<div class="border rounded p-3 h-100 bg-white">
-									<div class="d-flex align-items-center justify-content-between mb-2">
-										<span class="badge <?php echo $is_active ? 'bg-success' : 'bg-secondary'; ?>"><?php echo $is_active ? 'Active' : 'Inactive'; ?></span>
-										<small class="text-muted"><?php echo date('M d, Y h:i A', strtotime((string)$a['posted_at'])); ?></small>
-									</div>
-									<h6 class="fw-semibold mb-2"><?php echo htmlspecialchars((string)($a['title'] ?? 'Untitled')); ?></h6>
-									<p class="text-muted small mb-2"><?php echo nl2br(htmlspecialchars((string)($a['message'] ?? ''))); ?></p>
-									<p class="small mb-2"><strong>Expires:</strong> <?php echo htmlspecialchars((string)($a['expires_at'] ?? 'No expiry')); ?></p>
-									<?php if ($pic_url !== ''): ?>
-										<img src="<?php echo htmlspecialchars($pic_url); ?>" class="announcement-pic mb-2" alt="Announcement image">
-										<?php if (trim((string)($a['caption'] ?? '')) !== ''): ?>
-											<div class="small text-muted"><?php echo htmlspecialchars((string)$a['caption']); ?></div>
-										<?php endif; ?>
-									<?php endif; ?>
-								</div>
-							</div>
-						<?php endforeach; ?>
-					</div>
-				<?php endif; ?>
+			<div class="col-md-6 col-xl-3">
+				<div class="card card-soft menu-card h-100 p-3">
+					<div class="menu-icon bg-info-subtle text-info mb-3"><i class="bi bi-eye"></i></div>
+					<h6 class="fw-semibold">View Announcements</h6>
+					<p class="text-muted small mb-3">See announcement history and details.</p>
+					<a href="view_announcements.php" class="btn btn-info btn-sm text-white">Open</a>
+				</div>
+			</div>
+			<div class="col-md-6 col-xl-3">
+				<div class="card card-soft menu-card h-100 p-3">
+					<div class="menu-icon bg-warning-subtle text-warning mb-3"><i class="bi bi-pencil-square"></i></div>
+					<h6 class="fw-semibold">Edit Announcement</h6>
+					<p class="text-muted small mb-3">Select and update an existing announcement.</p>
+					<a href="edit_announcement.php" class="btn btn-warning btn-sm">Open</a>
+				</div>
+			</div>
+			<div class="col-md-6 col-xl-3">
+				<div class="card card-soft menu-card h-100 p-3">
+					<div class="menu-icon bg-danger-subtle text-danger mb-3"><i class="bi bi-trash"></i></div>
+					<h6 class="fw-semibold">Delete Announcement</h6>
+					<p class="text-muted small mb-3">Remove announcements you no longer need.</p>
+					<a href="delete_announcement.php" class="btn btn-danger btn-sm">Open</a>
+				</div>
 			</div>
 		</div>
 	</div>
